@@ -22,4 +22,10 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+
+  // 👇 Add this section
+  preview: {
+    host: true,
+    allowedHosts: ["ngaomaternal-care.onrender.com"],
+  },
 });
