@@ -23,7 +23,7 @@ export default defineConfig({
     },
   },
 
-  // 👇 Add this section
+
   preview: {
     host: true,
     allowedHosts: ["ngaomaternal-care.onrender.com"],
