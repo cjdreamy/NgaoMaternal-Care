@@ -26,6 +26,6 @@ export default defineConfig({
 
   preview: {
     host: true,
-    allowedHosts: ["NgaoMaternal_Care.onrender.com"],
+    allowedHosts: ["ngaomaternal-care-l8z2.onrender.com"],
   },
 });
