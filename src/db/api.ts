@@ -9,9 +9,7 @@ import type {
   HealthCheckinWithProfile,
   EmergencyAlertWithProfiles,
   PatientRecordWithProfile,
-  UserRole,
-  RiskLevel,
-  AlertStatus
+  UserRole
 } from '@/types';
 
 // ============ Profiles ============
@@ -96,7 +94,6 @@ export async function getAllClinics(): Promise<Clinic[]> {
 }
 
 export async function getNearestClinic(latitude: number, longitude: number): Promise<Clinic | null> {
-  // Simple distance calculation - in production, use PostGIS
   const { data, error } = await supabase
     .from('clinics')
     .select('*')
@@ -105,19 +102,18 @@ export async function getNearestClinic(latitude: number, longitude: number): Pro
 
   if (error || !data) return null;
 
-  // Calculate distances and find nearest
   const clinicsWithDistance = data.map(clinic => {
     const lat1 = latitude * Math.PI / 180;
     const lat2 = (clinic.latitude || 0) * Math.PI / 180;
     const dLat = lat2 - lat1;
     const dLon = ((clinic.longitude || 0) - longitude) * Math.PI / 180;
-    
+
     const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(lat1) * Math.cos(lat2) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      Math.cos(lat1) * Math.cos(lat2) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = 6371 * c; // Earth radius in km
-    
+
     return { ...clinic, distance };
   });
 
@@ -157,7 +153,7 @@ export async function getAllHealthCheckins(limit = 50, offset = 0): Promise<Heal
     .from('health_checkins')
     .select(`
       *,
-      mother:profiles!health_checkins_mother_id_fkey(*)
+      mother: profiles!health_checkins_mother_id_fkey(*)
     `)
     .order('checkin_date', { ascending: false })
     .range(offset, offset + limit - 1);
@@ -174,7 +170,7 @@ export async function getFlaggedCheckins(limit = 50): Promise<HealthCheckinWithP
     .from('health_checkins')
     .select(`
       *,
-      mother:profiles!health_checkins_mother_id_fkey(*)
+      mother: profiles!health_checkins_mother_id_fkey(*)
     `)
     .eq('flagged', true)
     .is('reviewed_by', null)
@@ -186,6 +182,21 @@ export async function getFlaggedCheckins(limit = 50): Promise<HealthCheckinWithP
     return [];
   }
   return Array.isArray(data) ? data : [];
+}
+
+export async function reviewCheckin(id: string, reviewerId: string) {
+  const { data, error } = await supabase
+    .from('health_checkins')
+    .update({
+      reviewed_by: reviewerId,
+      reviewed_at: new Date().toISOString()
+    })
+    .eq('id', id)
+    .select()
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
 }
 
 export async function updateHealthCheckin(id: string, updates: Partial<HealthCheckin>) {
@@ -248,8 +259,8 @@ export async function getAllEmergencyAlerts(limit = 50, offset = 0): Promise<Eme
     .from('emergency_alerts')
     .select(`
       *,
-      mother:profiles!emergency_alerts_mother_id_fkey(*),
-      trigger:profiles!emergency_alerts_triggered_by_fkey(*)
+      mother: profiles!emergency_alerts_mother_id_fkey(*),
+      trigger: profiles!emergency_alerts_triggered_by_fkey(*)
     `)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
@@ -266,8 +277,8 @@ export async function getActiveEmergencyAlerts(): Promise<EmergencyAlertWithProf
     .from('emergency_alerts')
     .select(`
       *,
-      mother:profiles!emergency_alerts_mother_id_fkey(*),
-      trigger:profiles!emergency_alerts_triggered_by_fkey(*)
+      mother: profiles!emergency_alerts_mother_id_fkey(*),
+      trigger: profiles!emergency_alerts_triggered_by_fkey(*)
     `)
     .eq('status', 'active')
     .order('created_at', { ascending: false });
@@ -310,6 +321,42 @@ export async function resolveEmergencyAlert(id: string, userId: string, notes?: 
 
   if (error) throw error;
   return data;
+}
+
+// ============ USSD Alerts ============
+export async function getUssdAlerts() {
+  const { data, error } = await supabase
+    .from('ussd_emergency_alerts')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching USSD alerts:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function resolveUssdAlert(id: string, status: string = 'resolved') {
+  const { data, error } = await supabase
+    .from('ussd_emergency_alerts')
+    .update({ status })
+    .eq('id', id)
+    .select()
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getTotalPatientCount() {
+  const { count, error } = await supabase
+    .from('profiles')
+    .select('*', { count: 'exact', head: true })
+    .eq('role', 'mother');
+
+  if (error) throw error;
+  return count || 0;
 }
 
 // ============ Educational Content ============
@@ -400,7 +447,7 @@ export async function getAllPatientRecords(limit = 50, offset = 0): Promise<Pati
     .from('patient_records')
     .select(`
       *,
-      mother:profiles!patient_records_mother_id_fkey(*)
+      mother: profiles!patient_records_mother_id_fkey(*)
     `)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
@@ -430,15 +477,20 @@ export async function getDashboardStats(userId: string, role: string) {
   }
 
   if (role === 'healthcare_provider' || role === 'admin') {
-    const [flaggedCheckins, activeAlerts] = await Promise.all([
+    const [flagged, activeApp, ussdAlerts, patientCount] = await Promise.all([
       getFlaggedCheckins(100),
-      getActiveEmergencyAlerts()
+      getActiveEmergencyAlerts(),
+      getUssdAlerts(),
+      getTotalPatientCount()
     ]);
 
+    const activeUssd = ussdAlerts.filter((a: any) => a.status === 'active');
+
     return {
-      flaggedCheckins: flaggedCheckins.length,
-      activeAlerts: activeAlerts.length,
-      criticalCases: flaggedCheckins.filter(c => c.risk_level === 'critical').length
+      flaggedCheckins: flagged.length,
+      activeAlerts: activeApp.length + activeUssd.length,
+      criticalCases: flagged.filter(c => c.risk_level === 'critical').length,
+      totalPatients: patientCount
     };
   }
 

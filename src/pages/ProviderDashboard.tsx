@@ -6,19 +6,22 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { getDashboardStats, getFlaggedCheckins, getActiveEmergencyAlerts, getAllPatientRecords } from '@/db/api';
+import { getDashboardStats, getFlaggedCheckins, getActiveEmergencyAlerts, getAllPatientRecords, getUssdAlerts, reviewCheckin, resolveUssdAlert } from '@/db/api';
 import type { HealthCheckinWithProfile, EmergencyAlertWithProfiles, PatientRecordWithProfile } from '@/types';
-import { Activity, AlertTriangle, Users, TrendingUp } from 'lucide-react';
+import { Activity, AlertTriangle, Users, TrendingUp, CheckCircle, Phone } from 'lucide-react';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 
 export default function ProviderDashboard() {
   const { user, profile } = useAuth();
   const [stats, setStats] = useState<any>({});
   const [flaggedCheckins, setFlaggedCheckins] = useState<HealthCheckinWithProfile[]>([]);
   const [activeAlerts, setActiveAlerts] = useState<EmergencyAlertWithProfiles[]>([]);
+  const [ussdAlerts, setUssdAlerts] = useState<any[]>([]);
   const [patients, setPatients] = useState<PatientRecordWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -28,23 +31,54 @@ export default function ProviderDashboard() {
 
   const loadDashboardData = async () => {
     if (!user) return;
-    
+
     try {
-      const [statsData, checkins, alerts, patientRecords] = await Promise.all([
+      const [statsData, checkins, alerts, patientRecords, ussd] = await Promise.all([
         getDashboardStats(user.id, profile?.role || 'healthcare_provider'),
         getFlaggedCheckins(50),
         getActiveEmergencyAlerts(),
-        getAllPatientRecords(20)
+        getAllPatientRecords(20),
+        getUssdAlerts()
       ]);
 
       setStats(statsData);
       setFlaggedCheckins(checkins);
       setActiveAlerts(alerts);
       setPatients(patientRecords);
+      setUssdAlerts(ussd.filter((a: any) => a.status === 'active'));
     } catch (error) {
       console.error('Error loading dashboard:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResolveCheckin = async (id: string) => {
+    if (!user) return;
+    setActionLoading(true);
+    try {
+      await reviewCheckin(id, user.id);
+      toast.success('Check-in marked as reviewed');
+      loadDashboardData();
+    } catch (error) {
+      toast.error('Failed to review check-in');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleResolveUssd = async (id: string) => {
+    console.log('Resolving USSD alert:', id);
+    setActionLoading(true);
+    try {
+      await resolveUssdAlert(id);
+      toast.success('USSD Alert resolved');
+      loadDashboardData();
+    } catch (error) {
+      console.error('USSD Resolution failed:', error);
+      toast.error('Failed to resolve USSD alert');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -131,7 +165,7 @@ export default function ProviderDashboard() {
               <Users className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{patients.length}</div>
+              <div className="text-2xl font-bold">{stats.totalPatients || patients.length}</div>
               <p className="text-xs text-muted-foreground">Under monitoring</p>
             </CardContent>
           </Card>
@@ -201,6 +235,15 @@ export default function ProviderDashboard() {
                           <Link to={`/patients/${checkin.mother_id}`}>
                             <Button size="sm" variant="outline">View Patient</Button>
                           </Link>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => handleResolveCheckin(checkin.id)}
+                            disabled={actionLoading}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Mark as Reviewed
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -225,7 +268,7 @@ export default function ProviderDashboard() {
                       <div key={alert.id} className="border-2 border-emergency rounded-lg p-4 space-y-2 bg-emergency/5">
                         <div className="flex items-start justify-between">
                           <div>
-                            <p className="font-medium text-emergency">EMERGENCY ALERT</p>
+                            <p className="font-medium text-emergency font-bold">APP EMERGENCY ALERT</p>
                             <p className="font-medium">{alert.mother?.full_name || 'Unknown Patient'}</p>
                             <p className="text-sm text-muted-foreground">
                               {format(new Date(alert.created_at), 'MMM d, yyyy h:mm a')}
@@ -233,20 +276,39 @@ export default function ProviderDashboard() {
                           </div>
                           <Badge variant="destructive">ACTIVE</Badge>
                         </div>
-                        {alert.location_description && (
-                          <p className="text-sm">
-                            <span className="font-medium">Location:</span> {alert.location_description}
-                          </p>
-                        )}
-                        {alert.latitude && alert.longitude && (
-                          <p className="text-sm text-muted-foreground">
-                            Coordinates: {alert.latitude.toFixed(6)}, {alert.longitude.toFixed(6)}
-                          </p>
-                        )}
                         <div className="flex gap-2 pt-2">
                           <Link to="/alerts">
-                            <Button size="sm" variant="destructive">Respond to Alert</Button>
+                            <Button size="sm" variant="destructive">Open in Alert Center</Button>
                           </Link>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* USSD Alerts */}
+                    {ussdAlerts.map((alert) => (
+                      <div key={alert.id} className="border-2 border-orange-500 rounded-lg p-4 space-y-2 bg-orange-50">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-medium text-orange-600 font-bold flex items-center gap-2">
+                              <Phone className="h-4 w-4" /> USSD EMERGENCY (GUEST)
+                            </p>
+                            <p className="font-medium text-lg">{alert.phone_number}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {format(new Date(alert.created_at), 'MMM d, yyyy h:mm a')}
+                            </p>
+                          </div>
+                          <Badge variant="destructive" className="bg-orange-600">ACTIVE</Badge>
+                        </div>
+                        <div className="flex gap-2 pt-2">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="bg-orange-600 hover:bg-orange-700"
+                            onClick={() => handleResolveUssd(alert.id)}
+                            disabled={actionLoading}
+                          >
+                            Mark as Resolved
+                          </Button>
                         </div>
                       </div>
                     ))}

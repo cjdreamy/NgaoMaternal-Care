@@ -7,15 +7,17 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { getAllEmergencyAlerts, acknowledgeEmergencyAlert, resolveEmergencyAlert } from '@/db/api';
+import { getAllEmergencyAlerts, acknowledgeEmergencyAlert, resolveEmergencyAlert, getUssdAlerts, resolveUssdAlert } from '@/db/api';
 import type { EmergencyAlertWithProfiles } from '@/types';
-import { AlertTriangle, MapPin, Clock, CheckCircle } from 'lucide-react';
+import { AlertTriangle, MapPin, Clock, CheckCircle, Phone, Smartphone } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 export default function AlertsPage() {
   const { user } = useAuth();
   const [alerts, setAlerts] = useState<EmergencyAlertWithProfiles[]>([]);
+  const [ussdAlerts, setUssdAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAlert, setSelectedAlert] = useState<EmergencyAlertWithProfiles | null>(null);
   const [resolveNotes, setResolveNotes] = useState('');
@@ -27,8 +29,12 @@ export default function AlertsPage() {
 
   const loadAlerts = async () => {
     try {
-      const data = await getAllEmergencyAlerts(100);
-      setAlerts(data);
+      const [standard, ussd] = await Promise.all([
+        getAllEmergencyAlerts(100),
+        getUssdAlerts()
+      ]);
+      setAlerts(standard);
+      setUssdAlerts(ussd || []);
     } catch (error) {
       console.error('Error loading alerts:', error);
     } finally {
@@ -38,14 +44,14 @@ export default function AlertsPage() {
 
   const handleAcknowledge = async (alertId: string) => {
     if (!user) return;
-    
+    console.log(`[ALERTS] Acknowledging alert: ${alertId} by user: ${user.id}`);
     setActionLoading(true);
     try {
       await acknowledgeEmergencyAlert(alertId, user.id);
       toast.success('Alert acknowledged');
       loadAlerts();
     } catch (error) {
-      console.error('Error acknowledging alert:', error);
+      console.error('[ALERTS] Acknowledge Error:', error);
       toast.error('Failed to acknowledge alert');
     } finally {
       setActionLoading(false);
@@ -54,7 +60,7 @@ export default function AlertsPage() {
 
   const handleResolve = async () => {
     if (!user || !selectedAlert) return;
-    
+    console.log(`[ALERTS] Resolving alert: ${selectedAlert.id} with notes: ${resolveNotes}`);
     setActionLoading(true);
     try {
       await resolveEmergencyAlert(selectedAlert.id, user.id, resolveNotes);
@@ -63,8 +69,23 @@ export default function AlertsPage() {
       setResolveNotes('');
       loadAlerts();
     } catch (error) {
-      console.error('Error resolving alert:', error);
+      console.error('[ALERTS] Resolve Error:', error);
       toast.error('Failed to resolve alert');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleResolveUssd = async (id: string) => {
+    console.log('Resolving USSD alert from AlertsPage:', id);
+    setActionLoading(true);
+    try {
+      await resolveUssdAlert(id);
+      toast.success('USSD Alert resolved');
+      loadAlerts();
+    } catch (error) {
+      console.error('USSD Resolution failed on AlertsPage:', error);
+      toast.error('Failed to resolve USSD alert');
     } finally {
       setActionLoading(false);
     }
@@ -100,251 +121,321 @@ export default function AlertsPage() {
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <AlertTriangle className="h-8 w-8 text-emergency" />
-            Emergency Alerts
+            Emergency Management
           </h1>
-          <p className="text-muted-foreground">Monitor and respond to emergency situations</p>
+          <p className="text-muted-foreground">Monitor and respond to app and USSD emergencies</p>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Active Alerts</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-emergency">{activeAlerts.length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Acknowledged</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{acknowledgedAlerts.length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Resolved</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-success">{resolvedAlerts.length}</div>
-            </CardContent>
-          </Card>
-        </div>
+        <Tabs defaultValue="app" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-8">
+            <TabsTrigger value="app" className="flex items-center gap-2">
+              <Smartphone className="h-4 w-4" /> App Alerts ({activeAlerts.length})
+            </TabsTrigger>
+            <TabsTrigger value="ussd" className="flex items-center gap-2">
+              <Phone className="h-4 w-4" /> USSD Guest Alerts ({ussdAlerts.filter(a => a.status === 'active').length})
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Active Alerts */}
-        {activeAlerts.length > 0 && (
-          <Card className="border-emergency">
-            <CardHeader>
-              <CardTitle className="text-emergency">Active Emergency Alerts</CardTitle>
-              <CardDescription>Require immediate attention</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {activeAlerts.map((alert) => (
-                <div key={alert.id} className="border-2 border-emergency rounded-lg p-4 space-y-3 bg-emergency/5">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <p className="font-bold text-lg">{alert.mother?.full_name || 'Unknown Patient'}</p>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
+          <TabsContent value="app" className="space-y-6">
+
+            {/* Summary Cards */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Total Active Alerts</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-emergency">
+                    {activeAlerts.length + ussdAlerts.filter(a => a.status === 'active').length}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {activeAlerts.length} App • {ussdAlerts.filter(a => a.status === 'active').length} USSD
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Acknowledged (App)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-blue-600">{acknowledgedAlerts.length}</div>
+                  <p className="text-xs text-muted-foreground mt-1">Provider currently responding</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Total Resolved</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-success">
+                    {resolvedAlerts.length + ussdAlerts.filter(a => a.status === 'resolved').length}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {resolvedAlerts.length} App • {ussdAlerts.filter(a => a.status === 'resolved').length} USSD
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Active Alerts */}
+            {activeAlerts.length > 0 && (
+              <Card className="border-emergency">
+                <CardHeader>
+                  <CardTitle className="text-emergency">Active Emergency Alerts</CardTitle>
+                  <CardDescription>Require immediate attention</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {activeAlerts.map((alert) => (
+                    <div key={alert.id} className="border-2 border-emergency rounded-lg p-4 space-y-3 bg-emergency/5">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <p className="font-bold text-lg">{alert.mother?.full_name || 'Unknown Patient'}</p>
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {format(new Date(alert.created_at), 'MMM d, yyyy h:mm a')}
+                          </p>
+                        </div>
+                        {getStatusBadge(alert.status)}
+                      </div>
+
+                      <div className="space-y-2 text-sm">
+                        <div>
+                          <span className="font-medium">Alert Type:</span> {alert.alert_type.replace('_', ' ').toUpperCase()}
+                        </div>
+                        {alert.location_description && (
+                          <div className="flex items-start gap-1">
+                            <MapPin className="h-4 w-4 mt-0.5 text-emergency" />
+                            <span>{alert.location_description}</span>
+                          </div>
+                        )}
+                        {alert.latitude && alert.longitude && (
+                          <div className="text-muted-foreground">
+                            GPS: {alert.latitude.toFixed(6)}, {alert.longitude.toFixed(6)}
+                          </div>
+                        )}
+                        <div>
+                          <span className="font-medium">Triggered by:</span> {alert.trigger?.full_name || 'Unknown'}
+                        </div>
+                        {alert.mother?.phone && (
+                          <div>
+                            <span className="font-medium">Contact:</span> {alert.mother.phone}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleAcknowledge(alert.id)}
+                          disabled={actionLoading}
+                        >
+                          Acknowledge
+                        </Button>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setSelectedAlert(alert)}
+                            >
+                              Resolve
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Resolve Emergency Alert</DialogTitle>
+                              <DialogDescription>
+                                Mark this alert as resolved and add resolution notes
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="notes">Resolution Notes</Label>
+                                <Textarea
+                                  id="notes"
+                                  placeholder="Describe how the emergency was resolved..."
+                                  value={resolveNotes}
+                                  onChange={(e) => setResolveNotes(e.target.value)}
+                                  rows={4}
+                                />
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button
+                                onClick={handleResolve}
+                                disabled={actionLoading}
+                              >
+                                {actionLoading ? 'Resolving...' : 'Resolve Alert'}
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Acknowledged Alerts */}
+            {acknowledgedAlerts.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Acknowledged Alerts</CardTitle>
+                  <CardDescription>Being handled by healthcare team</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {acknowledgedAlerts.map((alert) => (
+                    <div key={alert.id} className="border rounded-lg p-4 space-y-2">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-medium">{alert.mother?.full_name || 'Unknown Patient'}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {format(new Date(alert.created_at), 'MMM d, yyyy h:mm a')}
+                          </p>
+                        </div>
+                        {getStatusBadge(alert.status)}
+                      </div>
+                      {alert.location_description && (
+                        <p className="text-sm flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {alert.location_description}
+                        </p>
+                      )}
+                      <div className="flex gap-2 pt-2">
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setSelectedAlert(alert)}
+                            >
+                              Resolve
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Resolve Emergency Alert</DialogTitle>
+                              <DialogDescription>
+                                Mark this alert as resolved and add resolution notes
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="notes">Resolution Notes</Label>
+                                <Textarea
+                                  id="notes"
+                                  placeholder="Describe how the emergency was resolved..."
+                                  value={resolveNotes}
+                                  onChange={(e) => setResolveNotes(e.target.value)}
+                                  rows={4}
+                                />
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button
+                                onClick={handleResolve}
+                                disabled={actionLoading}
+                              >
+                                {actionLoading ? 'Resolving...' : 'Resolve Alert'}
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Resolved Alerts */}
+            {resolvedAlerts.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-success" />
+                    Resolved Alerts
+                  </CardTitle>
+                  <CardDescription>Successfully handled emergencies</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {resolvedAlerts.slice(0, 10).map((alert) => (
+                    <div key={alert.id} className="border rounded-lg p-4 space-y-2 opacity-75">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-medium">{alert.mother?.full_name || 'Unknown Patient'}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {format(new Date(alert.created_at), 'MMM d, yyyy h:mm a')}
+                          </p>
+                        </div>
+                        {getStatusBadge(alert.status)}
+                      </div>
+                      {alert.notes && (
+                        <p className="text-sm text-muted-foreground italic">
+                          Resolution: {alert.notes}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+          </TabsContent>
+
+          <TabsContent value="ussd" className="space-y-6">
+            <div className="grid gap-4">
+              {ussdAlerts.filter(a => a.status === 'active').map((alert) => (
+                <Card key={alert.id} className="border-emergency border-2 bg-emergency/5">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Phone className="h-5 w-5" /> {alert.phone_number}
+                      </CardTitle>
+                      <CardDescription>
                         {format(new Date(alert.created_at), 'MMM d, yyyy h:mm a')}
-                      </p>
+                      </CardDescription>
                     </div>
-                    {getStatusBadge(alert.status)}
-                  </div>
-
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="font-medium">Alert Type:</span> {alert.alert_type.replace('_', ' ').toUpperCase()}
-                    </div>
-                    {alert.location_description && (
-                      <div className="flex items-start gap-1">
-                        <MapPin className="h-4 w-4 mt-0.5 text-emergency" />
-                        <span>{alert.location_description}</span>
-                      </div>
-                    )}
-                    {alert.latitude && alert.longitude && (
-                      <div className="text-muted-foreground">
-                        GPS: {alert.latitude.toFixed(6)}, {alert.longitude.toFixed(6)}
-                      </div>
-                    )}
-                    <div>
-                      <span className="font-medium">Triggered by:</span> {alert.trigger?.full_name || 'Unknown'}
-                    </div>
-                    {alert.mother?.phone && (
-                      <div>
-                        <span className="font-medium">Contact:</span> {alert.mother.phone}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex gap-2 pt-2">
-                    <Button 
-                      size="sm" 
-                      onClick={() => handleAcknowledge(alert.id)}
+                    <Badge variant="destructive">ACTIVE USSD PANIC</Badge>
+                  </CardHeader>
+                  <CardContent className="flex justify-between items-center">
+                    <p className="text-sm">Guest user initiated an emergency panic via USSD dial-pad (Option 0).</p>
+                    <Button
+                      variant="default"
+                      onClick={() => handleResolveUssd(alert.id)}
                       disabled={actionLoading}
                     >
-                      Acknowledge
+                      Mark as Resolved
                     </Button>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => setSelectedAlert(alert)}
-                        >
-                          Resolve
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Resolve Emergency Alert</DialogTitle>
-                          <DialogDescription>
-                            Mark this alert as resolved and add resolution notes
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="notes">Resolution Notes</Label>
-                            <Textarea
-                              id="notes"
-                              placeholder="Describe how the emergency was resolved..."
-                              value={resolveNotes}
-                              onChange={(e) => setResolveNotes(e.target.value)}
-                              rows={4}
-                            />
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button 
-                            onClick={handleResolve}
-                            disabled={actionLoading}
-                          >
-                            {actionLoading ? 'Resolving...' : 'Resolve Alert'}
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               ))}
-            </CardContent>
-          </Card>
-        )}
 
-        {/* Acknowledged Alerts */}
-        {acknowledgedAlerts.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Acknowledged Alerts</CardTitle>
-              <CardDescription>Being handled by healthcare team</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {acknowledgedAlerts.map((alert) => (
-                <div key={alert.id} className="border rounded-lg p-4 space-y-2">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-medium">{alert.mother?.full_name || 'Unknown Patient'}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {format(new Date(alert.created_at), 'MMM d, yyyy h:mm a')}
-                      </p>
+              {ussdAlerts.filter(a => a.status === 'active').length === 0 && (
+                <Card>
+                  <CardContent className="py-12 text-center text-muted-foreground">
+                    No active USSD guest alerts at this time.
+                  </CardContent>
+                </Card>
+              )}
+
+              {ussdAlerts.filter(a => a.status === 'resolved').length > 0 && (
+                <div className="mt-8 space-y-4">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-success" /> Recently Resolved USSD
+                  </h3>
+                  {ussdAlerts.filter(a => a.status === 'resolved').slice(0, 5).map(alert => (
+                    <div key={alert.id} className="p-3 border rounded-lg flex justify-between items-center opacity-60">
+                      <span>{alert.phone_number}</span>
+                      <span className="text-xs text-muted-foreground">{format(new Date(alert.created_at), 'MMM d, h:mm a')}</span>
                     </div>
-                    {getStatusBadge(alert.status)}
-                  </div>
-                  {alert.location_description && (
-                    <p className="text-sm flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {alert.location_description}
-                    </p>
-                  )}
-                  <div className="flex gap-2 pt-2">
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => setSelectedAlert(alert)}
-                        >
-                          Resolve
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Resolve Emergency Alert</DialogTitle>
-                          <DialogDescription>
-                            Mark this alert as resolved and add resolution notes
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="notes">Resolution Notes</Label>
-                            <Textarea
-                              id="notes"
-                              placeholder="Describe how the emergency was resolved..."
-                              value={resolveNotes}
-                              onChange={(e) => setResolveNotes(e.target.value)}
-                              rows={4}
-                            />
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button 
-                            onClick={handleResolve}
-                            disabled={actionLoading}
-                          >
-                            {actionLoading ? 'Resolving...' : 'Resolve Alert'}
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Resolved Alerts */}
-        {resolvedAlerts.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-success" />
-                Resolved Alerts
-              </CardTitle>
-              <CardDescription>Successfully handled emergencies</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {resolvedAlerts.slice(0, 10).map((alert) => (
-                <div key={alert.id} className="border rounded-lg p-4 space-y-2 opacity-75">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-medium">{alert.mother?.full_name || 'Unknown Patient'}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {format(new Date(alert.created_at), 'MMM d, yyyy h:mm a')}
-                      </p>
-                    </div>
-                    {getStatusBadge(alert.status)}
-                  </div>
-                  {alert.notes && (
-                    <p className="text-sm text-muted-foreground italic">
-                      Resolution: {alert.notes}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-
-        {alerts.length === 0 && (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">No emergency alerts at this time</p>
-            </CardContent>
-          </Card>
-        )}
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );
