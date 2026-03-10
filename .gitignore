@@ -28,7 +28,7 @@ package-lock.json
 history/*.json
 .vite_cache
 node_modules
-README.md
+# README.md
 THRME_TOGGLE.md
 TODO.md
 .rules
@@ -41,7 +41,7 @@ AI_FEATURES.md
 biome.json
 ussd-service/.env
 ussd-service/.env.local
-USER_GUIDE.md
+#USER_GUIDE.md
 ussd-service/CALLBACK_URL_INFO.txt
 ussd-service/DATABASE_INTEGRATION.md
 ussd-service/DEPLOYMENT.md
