@@ -14,6 +14,7 @@ import type { UserRole } from '@/types';
 
 export default function RegisterPage() {
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -38,6 +39,11 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     if (!/^[a-zA-Z0-9_]+$/.test(username)) {
       setError('Username can only contain letters, numbers, and underscores');
       return;
@@ -46,7 +52,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const { error: signUpError } = await signUpWithUsername(username, password);
+      const { error: signUpError } = await signUpWithUsername(username, password, email);
       if (signUpError) {
         setError(signUpError.message || 'Registration failed');
         setLoading(false);
@@ -58,10 +64,11 @@ export default function RegisterPage() {
 
       // Get the current user and update profile with additional info
       const { data: { user } } = await (await import('@/db/supabase')).supabase.auth.getUser();
-      
+
       if (user) {
         await updateProfile(user.id, {
           username,
+          email,
           full_name: fullName || null,
           phone: phone || null,
           role
@@ -130,6 +137,18 @@ export default function RegisterPage() {
                 placeholder="Choose a username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email Address</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={loading}
               />

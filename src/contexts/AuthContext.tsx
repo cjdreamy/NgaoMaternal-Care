@@ -21,7 +21,7 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   signInWithUsername: (username: string, password: string) => Promise<{ error: Error | null }>;
-  signUpWithUsername: (username: string, password: string) => Promise<{ error: Error | null }>;
+  signUpWithUsername: (username: string, password: string, email?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -66,7 +66,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithUsername = async (username: string, password: string) => {
     try {
-      const email = `${username}@miaoda.com`;
+      let email = username;
+
+      // If it's not an email address, try to find the email associated with this username
+      if (!username.includes('@')) {
+        // First try the lookup RPC (requires a custom function in Supabase)
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_email_by_username', { p_username: username });
+
+        if (!rpcError && rpcData) {
+          email = rpcData;
+        } else {
+          // Fallback to the predictable pattern if RPC fails/not installed
+          email = `${username}@miaoda.com`;
+        }
+      }
+
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -79,9 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUpWithUsername = async (username: string, password: string) => {
+  const signUpWithUsername = async (username: string, password: string, email: string = `${username}@miaoda.com`) => {
     try {
-      const email = `${username}@miaoda.com`;
       const { error } = await supabase.auth.signUp({
         email,
         password,

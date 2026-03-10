@@ -1,6 +1,7 @@
 import { corsHeaders } from '../_shared/cors.ts';
 
-const GEMINI_API_URL = 'https://app-a2blkp7a43cx-api-VaOwP8E7dJqa.gateway.appmedo.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse';
+const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -18,11 +19,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get API key from environment
-    const apiKey = Deno.env.get('INTEGRATIONS_API_KEY');
-    if (!apiKey) {
+    if (!GEMINI_API_KEY) {
       return new Response(
-        JSON.stringify({ error: 'API key not configured' }),
+        JSON.stringify({ error: 'GEMINI_API_KEY not configured in Edge Function secrets' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -68,7 +67,6 @@ IMPORTANT: Always recommend consulting healthcare providers for medical concerns
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Gateway-Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({ contents }),
     });
@@ -76,18 +74,11 @@ IMPORTANT: Always recommend consulting healthcare providers for medical concerns
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Gemini API error:', errorText);
-      
+
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: 'API quota exceeded. Please try again later.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: 'Insufficient API balance. Please contact support.' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 

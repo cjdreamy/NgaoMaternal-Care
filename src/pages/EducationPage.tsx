@@ -6,14 +6,76 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { getEducationalContent } from '@/db/api';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/config/supabase-config';
 import type { EducationalContent } from '@/types';
-import { BookOpen, Calendar, Sparkles, ExternalLink, Loader2 } from 'lucide-react';
+import { BookOpen, Calendar, Sparkles, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { generateAIResponse } from '@/services/gemini';
+
+const FEATURED_CONTENT: EducationalContent[] = [
+  {
+    id: 'static-1',
+    title: 'Welcome to Your Pregnancy Journey',
+    content: 'Congratulations on your pregnancy! This is an exciting time. Regular check-ins and monitoring are essential for you and your baby\'s health. Remember to attend all clinic appointments and report any unusual symptoms immediately.',
+    category: 'General',
+    week_number: 1,
+    language: 'en',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'static-2',
+    title: 'Understanding Warning Signs',
+    content: 'Important warning signs to watch for: severe headaches, blurred vision, severe abdominal pain, reduced fetal movement, vaginal bleeding, or sudden swelling. If you experience any of these, use the emergency alert immediately.',
+    category: 'Safety',
+    week_number: 4,
+    language: 'en',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'static-3',
+    title: 'Nutrition During Pregnancy',
+    content: 'Eating well is crucial for your baby\'s development. Focus on: iron-rich foods (spinach, beans), calcium (milk, yogurt), proteins (eggs, fish, meat), and plenty of fruits and vegetables. Drink at least 8 glasses of water daily.',
+    category: 'Nutrition',
+    week_number: 8,
+    language: 'en',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'static-4',
+    title: 'Blood Pressure Awareness',
+    content: 'High blood pressure during pregnancy can be dangerous. Symptoms include: severe headaches, vision changes, upper abdominal pain. Monitor your blood pressure regularly and report any concerns.',
+    category: 'Health',
+    week_number: 20,
+    language: 'en',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'static-5',
+    title: 'Fetal Movement Monitoring',
+    content: 'From week 28 onwards, monitor your baby\'s movements daily. You should feel at least 10 movements in 2 hours. If movements decrease significantly, contact your healthcare provider immediately.',
+    category: 'Monitoring',
+    week_number: 28,
+    language: 'en',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'static-6',
+    title: 'Preparing for Labor',
+    content: 'As you approach your due date, prepare your hospital bag, know the route to your clinic, and ensure your emergency contacts are updated in the system. Practice breathing exercises and stay calm.',
+    category: 'Preparation',
+    week_number: 36,
+    language: 'en',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
 
 export default function EducationPage() {
-  const { profile } = useAuth();
   const [content, setContent] = useState<EducationalContent[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -42,18 +104,7 @@ export default function EducationPage() {
     setAiSuggestions('');
 
     try {
-      // Call Edge Function directly with fetch for SSE streaming
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/gemini-chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: 'user',
-              content: `Suggest 5-7 high-quality maternal health resources including:
+      const prompt = `Suggest 5-7 high-quality maternal health resources including:
 1. Recent articles from reputable medical sources (WHO, CDC, medical journals)
 2. Educational YouTube videos about pregnancy and maternal care
 3. Publications from maternal health doctors and experts
@@ -65,51 +116,10 @@ For each resource, provide:
 - Brief description (1-2 sentences)
 - Why it's valuable for expectant mothers
 
-Focus on trustworthy, evidence-based content that covers topics like prenatal care, nutrition, warning signs, fetal development, and labor preparation.`
-            }
-          ],
-          type: 'suggestions'
-        })
-      });
+Focus on trustworthy, evidence-based content that covers topics like prenatal care, nutrition, warning signs, fetal development, and labor preparation.`;
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('AI suggestions error:', errorText);
-        throw new Error(errorText || 'Failed to get suggestions');
-      }
-
-      // Handle streaming response
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('No response body');
-      }
-
-      const decoder = new TextDecoder();
-      let fullResponse = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const jsonData = JSON.parse(line.slice(6));
-              const text = jsonData.candidates?.[0]?.content?.parts?.[0]?.text;
-              
-              if (text) {
-                fullResponse += text;
-                setAiSuggestions(fullResponse);
-              }
-            } catch (e) {
-              console.warn('Failed to parse SSE data:', e);
-            }
-          }
-        }
-      }
+      const response = await generateAIResponse(prompt);
+      setAiSuggestions(response);
     } catch (error: any) {
       console.error('Error loading AI suggestions:', error);
       toast.error('Failed to load AI suggestions. Please try again.');
@@ -119,11 +129,13 @@ Focus on trustworthy, evidence-based content that covers topics like prenatal ca
     }
   };
 
-  const categories = ['all', ...Array.from(new Set(content.map(c => c.category)))];
+  const allContent = [...FEATURED_CONTENT, ...content];
 
-  const filteredContent = selectedCategory === 'all' 
-    ? content 
-    : content.filter(c => c.category === selectedCategory);
+  const categories = ['all', 'General', 'Safety', 'Nutrition', 'Health', 'Monitoring', 'Preparation'];
+
+  const filteredContent = selectedCategory === 'all'
+    ? allContent
+    : allContent.filter(c => c.category === selectedCategory);
 
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {

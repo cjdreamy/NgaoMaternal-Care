@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/config/supabase-config';
 import { toast } from 'sonner';
+import { generateAIResponse } from '@/services/gemini';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -43,73 +43,18 @@ export function ChatBot() {
     abortControllerRef.current = new AbortController();
 
     try {
-      // Call Edge Function directly with fetch for SSE streaming
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/gemini-chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
-          messages: [...messages, userMessage],
-          type: 'chat'
-        }),
-        signal: abortControllerRef.current.signal
-      });
+      const prompt = `You are a compassionate maternal health assistant for NgaoMaternal Care. Provide evidence-based information, supportive responses, and guidance on when to seek medical attention. Always recommend consulting healthcare providers for medical concerns.
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Edge function error:', errorText);
-        throw new Error(errorText || 'Failed to get response');
-      }
+Conversation history:
+${messages.map(m => `${m.role}: ${m.content}`).join('\n')}
+user: ${input.trim()}`;
 
-      // Handle streaming response
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('No response body');
-      }
+      const response = await generateAIResponse(prompt);
 
-      const decoder = new TextDecoder();
-      let assistantMessage = '';
-
-      // Add empty assistant message that we'll update
-      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const jsonData = JSON.parse(line.slice(6));
-              const text = jsonData.candidates?.[0]?.content?.parts?.[0]?.text;
-              
-              if (text) {
-                assistantMessage += text;
-                // Update the last message with accumulated text
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  newMessages[newMessages.length - 1] = {
-                    role: 'assistant',
-                    content: assistantMessage
-                  };
-                  return newMessages;
-                });
-              }
-            } catch (e) {
-              // Skip invalid JSON
-              console.warn('Failed to parse SSE data:', e);
-            }
-          }
-        }
-      }
+      setMessages(prev => [...prev, { role: 'assistant', content: response }]);
     } catch (error: any) {
       console.error('Chat error:', error);
-      
+
       if (error.name === 'AbortError') {
         return; // Request was cancelled
       }
@@ -118,7 +63,7 @@ export function ChatBot() {
         role: 'assistant',
         content: 'I apologize, but I\'m having trouble responding right now. Please try again or contact your healthcare provider for urgent concerns.'
       }]);
-      
+
       toast.error('Failed to get response. Please try again.');
     } finally {
       setIsLoading(false);
@@ -168,9 +113,8 @@ export function ChatBot() {
             {messages.map((message, index) => (
               <div
                 key={index}
-                className={`flex gap-3 ${
-                  message.role === 'user' ? 'justify-end' : 'justify-start'
-                }`}
+                className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'
+                  }`}
               >
                 {message.role === 'assistant' && (
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -178,11 +122,10 @@ export function ChatBot() {
                   </div>
                 )}
                 <div
-                  className={`rounded-lg px-4 py-2 max-w-[75%] break-words overflow-wrap-anywhere ${
-                    message.role === 'user'
+                  className={`rounded-lg px-4 py-2 max-w-[75%] break-words overflow-wrap-anywhere ${message.role === 'user'
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted'
-                  }`}
+                    }`}
                 >
                   <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
                 </div>

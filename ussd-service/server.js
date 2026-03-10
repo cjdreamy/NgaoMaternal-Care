@@ -1,10 +1,11 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
 
 // Environment variables - set these in your .env file
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ldroymannrscialbkqjp.supabase.co';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'your-service-key-here';
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const PORT = process.env.PORT || 3000;
 
 // Initialize Supabase client
@@ -19,15 +20,25 @@ const sessions = new Map();
 
 // Helper function to get or create user profile by phone
 async function getUserByPhone(phoneNumber) {
+  // Normalize phone number (handle simulators that send +254 vs database that might store 254)
+  const normalizedPhone = phoneNumber.startsWith('+') ? phoneNumber.substring(1) : phoneNumber;
+  console.log(`Looking up profile for phone: ${normalizedPhone} (original: ${phoneNumber})`);
+
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
-    .eq('phone', phoneNumber)
+    .or(`phone.eq.${phoneNumber},phone.eq.${normalizedPhone}`)
     .maybeSingle();
 
   if (error) {
     console.error('Error fetching user:', error);
     return null;
+  }
+
+  if (data) {
+    console.log(`Found user: ${data.full_name || data.username} (${data.id})`);
+  } else {
+    console.warn(`No user found for phone: ${phoneNumber} or ${normalizedPhone}`);
   }
 
   return data;
@@ -138,12 +149,16 @@ app.get('/', (req, res) => {
 
 // Main USSD endpoint
 app.post('/ussd', async (req, res) => {
+  console.log('Received USSD request:', req.body);
   const {
     sessionId,
     serviceCode,
     phoneNumber,
-    text,
   } = req.body;
+
+  // Normalize text - trim whitespace and handle null
+  const text = (req.body.text || '').trim();
+  console.log(`Processed text: "${text}"`);
 
   let response = '';
   const session = getSession(sessionId);
@@ -163,7 +178,7 @@ How are you feeling today?
 4. View my last check-in
 5. Educational resources`;
   }
-  
+
   // EMERGENCY PANIC BUTTON
   else if (text === '0') {
     if (user) {
@@ -377,17 +392,29 @@ Emergency Hotline: 0800-MATERNAL`;
   }
 
   else if (text === '3*1') {
-    response = `END Nearest Clinics:
+    try {
+      const { data: clinics, error } = await supabase
+        .from('clinics')
+        .select('name, address, phone')
+        .limit(3);
 
+      if (error || !clinics || clinics.length === 0) {
+        response = `END Nearest Clinics:
 1. Central Maternal Health Clinic
    123 Healthcare Ave, Nairobi
    Tel: +254-700-123456
 
 2. Rural Health Center - Kisumu
    45 Medical Road, Kisumu
-   Tel: +254-700-234567
-
-Visit our website for more clinics.`;
+   Tel: +254-700-234567`;
+      } else {
+        let clinicList = clinics.map((c, i) => `${i + 1}. ${c.name}\n   ${c.address}\n   Tel: ${c.phone || 'N/A'}`).join('\n\n');
+        response = `END Nearest Clinics:\n\n${clinicList}\n\nVisit our website for more.`;
+      }
+    } catch (err) {
+      console.error('Error fetching clinics:', err);
+      response = `END Unable to fetch clinics at this time. Please try again later.`;
+    }
   }
 
   else if (text === '3*2') {
@@ -503,7 +530,8 @@ Best time: After meals or rest.`;
 
   // Default fallback
   else {
-    response = `CON Invalid option. Please try again.
+    console.warn(`No match found for text: "${text}"`);
+    response = `CON Invalid option (${text}). Please try again.
 
 0. EMERGENCY
 1. I'm feeling well
