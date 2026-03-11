@@ -108,3 +108,14 @@ export interface PatientRecordWithProfile extends PatientRecord {
   mother?: Profile | null;
   provider?: Profile | null;
 }
+
+export interface ActivityLog {
+  id: string;
+  user_id: string | null;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  details: string | null;
+  created_at: string;
+  user?: Profile | null;
+}

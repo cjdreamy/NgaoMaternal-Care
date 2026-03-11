@@ -80,7 +80,7 @@ export default function AlertsPage() {
     console.log('Resolving USSD alert from AlertsPage:', id);
     setActionLoading(true);
     try {
-      await resolveUssdAlert(id);
+      await resolveUssdAlert(id, user?.id);
       toast.success('USSD Alert resolved');
       loadAlerts();
     } catch (error) {

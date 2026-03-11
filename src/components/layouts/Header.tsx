@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Heart, Menu } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ThemeToggle } from '@/components/features/ThemeToggle';
 import type { UserRole } from '@/types';
@@ -79,8 +79,8 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-6">
           <Link to="/" className="flex items-center gap-2">
-            <img 
-              src="https://miaoda-conversation-file.s3cdn.medo.dev/user-a1icbsdgcg00/conv-a2blkp7a43cw/20260310/file-a66t82v582kg.jpg"
+            <img
+              src="/ngaologo.jpg"
               alt="NgaoMaternal Care"
               className="h-9 w-9 object-cover rounded-lg"
             />

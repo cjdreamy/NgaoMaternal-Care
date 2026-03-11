@@ -9,7 +9,8 @@ import type {
   HealthCheckinWithProfile,
   EmergencyAlertWithProfiles,
   PatientRecordWithProfile,
-  UserRole
+  UserRole,
+  ActivityLog
 } from '@/types';
 
 // ============ Profiles ============
@@ -192,10 +193,21 @@ export async function reviewCheckin(id: string, reviewerId: string) {
       reviewed_at: new Date().toISOString()
     })
     .eq('id', id)
-    .select()
+    .select('*, mother:profiles!health_checkins_mother_id_fkey(*)')
     .maybeSingle();
 
   if (error) throw error;
+
+  if (data) {
+    await createActivityLog({
+      user_id: reviewerId,
+      action: 'Reviewed health check-in',
+      entity_type: 'health_checkin',
+      entity_id: id,
+      details: `Health check-in for ${data.mother?.full_name || 'unknown patient'} reviewed`
+    });
+  }
+
   return data;
 }
 
@@ -299,10 +311,21 @@ export async function acknowledgeEmergencyAlert(id: string, userId: string) {
       acknowledged_at: new Date().toISOString()
     })
     .eq('id', id)
-    .select()
+    .select('*, mother:profiles!emergency_alerts_mother_id_fkey(*)')
     .maybeSingle();
 
   if (error) throw error;
+
+  if (data) {
+    await createActivityLog({
+      user_id: userId,
+      action: 'Acknowledged emergency alert',
+      entity_type: 'emergency_alert',
+      entity_id: id,
+      details: `Acknowleged alert for ${data.mother?.full_name || 'unknown patient'}`
+    });
+  }
+
   return data;
 }
 
@@ -316,10 +339,21 @@ export async function resolveEmergencyAlert(id: string, userId: string, notes?: 
       notes: notes || null
     })
     .eq('id', id)
-    .select()
+    .select('*, mother:profiles!emergency_alerts_mother_id_fkey(*)')
     .maybeSingle();
 
   if (error) throw error;
+
+  if (data) {
+    await createActivityLog({
+      user_id: userId,
+      action: 'Resolved emergency alert',
+      entity_type: 'emergency_alert',
+      entity_id: id,
+      details: `Resolved alert for ${data.mother?.full_name || 'unknown patient'}${notes ? ': ' + notes : ''}`
+    });
+  }
+
   return data;
 }
 
@@ -337,7 +371,7 @@ export async function getUssdAlerts() {
   return data || [];
 }
 
-export async function resolveUssdAlert(id: string, status: string = 'resolved') {
+export async function resolveUssdAlert(id: string, userId?: string, status: string = 'resolved') {
   const { data, error } = await supabase
     .from('ussd_emergency_alerts')
     .update({ status })
@@ -346,6 +380,17 @@ export async function resolveUssdAlert(id: string, status: string = 'resolved') 
     .maybeSingle();
 
   if (error) throw error;
+
+  if (data && userId) {
+    await createActivityLog({
+      user_id: userId,
+      action: 'Resolved USSD alert',
+      entity_type: 'ussd_alert',
+      entity_id: id,
+      details: `Resolved USSD guest alert for ${data.phone_number}`
+    });
+  }
+
   return data;
 }
 
@@ -495,4 +540,34 @@ export async function getDashboardStats(userId: string, role: string) {
   }
 
   return {};
+}
+// ============ Activity Logs ============
+export async function createActivityLog(log: Omit<ActivityLog, 'id' | 'created_at' | 'user'>) {
+  const { data, error } = await supabase
+    .from('activity_logs')
+    .insert(log)
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error creating activity log:', error);
+  }
+  return data;
+}
+
+export async function getActivityLogs(limit = 50): Promise<ActivityLog[]> {
+  const { data, error } = await supabase
+    .from('activity_logs')
+    .select(`
+      *,
+      user: profiles!activity_logs_user_id_fkey(*)
+    `)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('Error fetching activity logs:', error);
+    return [];
+  }
+  return Array.isArray(data) ? data : [];
 }

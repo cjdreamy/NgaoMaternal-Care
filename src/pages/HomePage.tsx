@@ -9,7 +9,7 @@ export default function HomePage() {
       {/* Hero Section with Background Image */}
       <section className="relative py-20 md:py-32 overflow-hidden">
         {/* Background Image with Overlay */}
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
             backgroundImage: 'url(https://miaoda-conversation-file.s3cdn.medo.dev/user-a1icbsdgcg00/conv-a2blkp7a43cw/20260310/file-a66tzpapzq4g.jpg)',
@@ -17,13 +17,13 @@ export default function HomePage() {
         >
           <div className="absolute inset-0 bg-gradient-to-br from-background/70 via-background/60 to-background/70 backdrop-blur-[2px]" />
         </div>
-        
+
         <div className="container relative z-10">
           <div className="max-w-3xl mx-auto text-center space-y-6">
             {/* Logo */}
             <div className="flex justify-center mb-6">
-              <img 
-                src="https://miaoda-conversation-file.s3cdn.medo.dev/user-a1icbsdgcg00/conv-a2blkp7a43cw/20260310/file-a66t82v582kg.jpg"
+              <img
+                src="/ngaologo.jpg"
                 alt="NgaoMaternal Care Logo"
                 className="h-20 w-20 object-cover rounded-xl shadow-lg"
               />
@@ -35,7 +35,7 @@ export default function HomePage() {
               Bridging the gap between rural pregnant women and healthcare facilities
             </p>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              24/7 health monitoring, emergency alerts, and prenatal education through accessible technology. 
+              24/7 health monitoring, emergency alerts, and prenatal education through accessible technology.
               Our mission: Zero preventable maternal deaths.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
@@ -74,7 +74,7 @@ export default function HomePage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  Daily health check-ins with automatic risk flagging. Monitor vital signs including blood pressure, 
+                  Daily health check-ins with automatic risk flagging. Monitor vital signs including blood pressure,
                   heart rate, and fetal movement to identify complications early.
                 </p>
               </CardContent>
@@ -90,7 +90,7 @@ export default function HomePage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  One-tap panic button with GPS location transmission to the nearest clinic. 
+                  One-tap panic button with GPS location transmission to the nearest clinic.
                   Accessible to mothers and family members for immediate emergency alerts.
                 </p>
               </CardContent>
@@ -106,7 +106,7 @@ export default function HomePage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  Weekly educational content in local languages. Prenatal guidance, warning signs awareness, 
+                  Weekly educational content in local languages. Prenatal guidance, warning signs awareness,
                   and family support information delivered directly to you.
                 </p>
               </CardContent>

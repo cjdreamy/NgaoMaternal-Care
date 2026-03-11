@@ -6,9 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { getDashboardStats, getFlaggedCheckins, getActiveEmergencyAlerts, getAllPatientRecords, getUssdAlerts, reviewCheckin, resolveUssdAlert } from '@/db/api';
-import type { HealthCheckinWithProfile, EmergencyAlertWithProfiles, PatientRecordWithProfile } from '@/types';
-import { Activity, AlertTriangle, Users, TrendingUp, CheckCircle, Phone } from 'lucide-react';
+import { getDashboardStats, getFlaggedCheckins, getActiveEmergencyAlerts, getAllPatientRecords, getUssdAlerts, reviewCheckin, resolveUssdAlert, getActivityLogs } from '@/db/api';
+import type { HealthCheckinWithProfile, EmergencyAlertWithProfiles, PatientRecordWithProfile, ActivityLog } from '@/types';
+import { Activity, AlertTriangle, Users, TrendingUp, CheckCircle, Phone, History, Clock, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -20,6 +20,7 @@ export default function ProviderDashboard() {
   const [activeAlerts, setActiveAlerts] = useState<EmergencyAlertWithProfiles[]>([]);
   const [ussdAlerts, setUssdAlerts] = useState<any[]>([]);
   const [patients, setPatients] = useState<PatientRecordWithProfile[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -33,12 +34,13 @@ export default function ProviderDashboard() {
     if (!user) return;
 
     try {
-      const [statsData, checkins, alerts, patientRecords, ussd] = await Promise.all([
+      const [statsData, checkins, alerts, patientRecords, ussd, logs] = await Promise.all([
         getDashboardStats(user.id, profile?.role || 'healthcare_provider'),
         getFlaggedCheckins(50),
         getActiveEmergencyAlerts(),
         getAllPatientRecords(20),
-        getUssdAlerts()
+        getUssdAlerts(),
+        getActivityLogs(20)
       ]);
 
       setStats(statsData);
@@ -46,6 +48,7 @@ export default function ProviderDashboard() {
       setActiveAlerts(alerts);
       setPatients(patientRecords);
       setUssdAlerts(ussd.filter((a: any) => a.status === 'active'));
+      setActivityLogs(logs);
     } catch (error) {
       console.error('Error loading dashboard:', error);
     } finally {
@@ -68,10 +71,11 @@ export default function ProviderDashboard() {
   };
 
   const handleResolveUssd = async (id: string) => {
+    if (!user) return;
     console.log('Resolving USSD alert:', id);
     setActionLoading(true);
     try {
-      await resolveUssdAlert(id);
+      await resolveUssdAlert(id, user.id);
       toast.success('USSD Alert resolved');
       loadDashboardData();
     } catch (error) {
@@ -177,6 +181,7 @@ export default function ProviderDashboard() {
             <TabsTrigger value="flagged">Flagged Check-ins</TabsTrigger>
             <TabsTrigger value="alerts">Emergency Alerts</TabsTrigger>
             <TabsTrigger value="patients">Patients</TabsTrigger>
+            <TabsTrigger value="activity">Recent Activity</TabsTrigger>
           </TabsList>
 
           <TabsContent value="flagged" className="space-y-4">
@@ -343,6 +348,53 @@ export default function ProviderDashboard() {
                         <Link to={`/patients/${record.mother_id}`}>
                           <Button size="sm" variant="outline">View Details</Button>
                         </Link>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="activity" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <History className="h-5 w-5 text-primary" />
+                  Recent Provider Activity
+                </CardTitle>
+                <CardDescription>Tracking actions taken by healthcare providers</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {activityLogs.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No activity logs found</p>
+                ) : (
+                  <div className="space-y-4">
+                    {activityLogs.map((log) => (
+                      <div key={log.id} className="flex items-start gap-4 border-b pb-4 last:border-0 last:pb-0">
+                        <div className="mt-1">
+                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <Info className="h-4 w-4 text-primary" />
+                          </div>
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <p className="text-sm font-medium">
+                            {log.action}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {log.details}
+                          </p>
+                          <div className="flex items-center gap-4 mt-2">
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              {log.user?.full_name || 'System'}
+                            </span>
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {format(new Date(log.created_at), 'MMM d, h:mm a')}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
