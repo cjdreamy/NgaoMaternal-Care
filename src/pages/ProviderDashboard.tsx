@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { getDashboardStats, getFlaggedCheckins, getActiveEmergencyAlerts, getAllPatientRecords, getUssdAlerts, reviewCheckin, resolveUssdAlert, getActivityLogs } from '@/db/api';
 import type { HealthCheckinWithProfile, EmergencyAlertWithProfiles, PatientRecordWithProfile, ActivityLog } from '@/types';
 import { Activity, AlertTriangle, Users, TrendingUp, CheckCircle, Phone, History, Clock, Info } from 'lucide-react';
@@ -23,6 +26,8 @@ export default function ProviderDashboard() {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [resolveNotes, setResolveNotes] = useState('');
+  const [selectedUssdAlert, setSelectedUssdAlert] = useState<any | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -70,13 +75,14 @@ export default function ProviderDashboard() {
     }
   };
 
-  const handleResolveUssd = async (id: string) => {
-    if (!user) return;
-    console.log('Resolving USSD alert:', id);
+  const handleResolveUssd = async () => {
+    if (!user || !selectedUssdAlert) return;
     setActionLoading(true);
     try {
-      await resolveUssdAlert(id, user.id);
-      toast.success('USSD Alert resolved');
+      await resolveUssdAlert(selectedUssdAlert.id, user.id, resolveNotes);
+      toast.success('USSD Alert resolved successfully');
+      setSelectedUssdAlert(null);
+      setResolveNotes('');
       loadDashboardData();
     } catch (error) {
       console.error('USSD Resolution failed:', error);
@@ -305,16 +311,48 @@ export default function ProviderDashboard() {
                           <Badge variant="destructive" className="bg-orange-600">ACTIVE</Badge>
                         </div>
                         <div className="flex gap-2 pt-2">
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="bg-orange-600 hover:bg-orange-700"
-                            onClick={() => handleResolveUssd(alert.id)}
-                            disabled={actionLoading}
-                          >
-                            Mark as Resolved
-                          </Button>
+                          <Dialog open={selectedUssdAlert?.id === alert.id} onOpenChange={(open) => !open && setSelectedUssdAlert(null)}>
+                            <DialogTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="bg-orange-600 hover:bg-orange-700"
+                                onClick={() => setSelectedUssdAlert(alert)}
+                              >
+                                Mark as Resolved
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Resolve USSD Emergency</DialogTitle>
+                                <DialogDescription>
+                                  Mark emergency from {alert.phone_number} as resolved
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor="dashboard-ussd-notes">Resolution Notes</Label>
+                                  <Textarea
+                                    id="dashboard-ussd-notes"
+                                    placeholder="Briefly describe the outcome..."
+                                    value={resolveNotes}
+                                    onChange={(e) => setResolveNotes(e.target.value)}
+                                    rows={4}
+                                  />
+                                </div>
+                              </div>
+                              <DialogFooter>
+                                <Button
+                                  onClick={handleResolveUssd}
+                                  disabled={actionLoading}
+                                >
+                                  {actionLoading ? 'Resolving...' : 'Confirm Resolution'}
+                                </Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
                         </div>
+
                       </div>
                     ))}
                   </div>

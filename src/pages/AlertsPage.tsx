@@ -20,6 +20,7 @@ export default function AlertsPage() {
   const [ussdAlerts, setUssdAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAlert, setSelectedAlert] = useState<EmergencyAlertWithProfiles | null>(null);
+  const [selectedUssdAlert, setSelectedUssdAlert] = useState<any | null>(null);
   const [resolveNotes, setResolveNotes] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -76,15 +77,18 @@ export default function AlertsPage() {
     }
   };
 
-  const handleResolveUssd = async (id: string) => {
-    console.log('Resolving USSD alert from AlertsPage:', id);
+  const handleResolveUssd = async () => {
+    if (!selectedUssdAlert) return;
+    console.log('[ALERTS] Resolving USSD alert:', selectedUssdAlert.id, 'with notes:', resolveNotes);
     setActionLoading(true);
     try {
-      await resolveUssdAlert(id, user?.id);
-      toast.success('USSD Alert resolved');
+      await resolveUssdAlert(selectedUssdAlert.id, user?.id, resolveNotes);
+      toast.success('USSD Alert resolved successfully');
+      setSelectedUssdAlert(null);
+      setResolveNotes('');
       loadAlerts();
     } catch (error) {
-      console.error('USSD Resolution failed on AlertsPage:', error);
+      console.error('[ALERTS] USSD Resolution Error:', error);
       toast.error('Failed to resolve USSD alert');
     } finally {
       setActionLoading(false);
@@ -399,15 +403,46 @@ export default function AlertsPage() {
                     </div>
                     <Badge variant="destructive">ACTIVE USSD PANIC</Badge>
                   </CardHeader>
-                  <CardContent className="flex justify-between items-center">
+                  <CardContent className="flex justify-between items-center gap-4">
                     <p className="text-sm">Guest user initiated an emergency panic via USSD dial-pad (Option 0).</p>
-                    <Button
-                      variant="default"
-                      onClick={() => handleResolveUssd(alert.id)}
-                      disabled={actionLoading}
-                    >
-                      Mark as Resolved
-                    </Button>
+                    <Dialog open={selectedUssdAlert?.id === alert.id} onOpenChange={(open) => !open && setSelectedUssdAlert(null)}>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="default"
+                          onClick={() => setSelectedUssdAlert(alert)}
+                        >
+                          Mark as Resolved
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Resolve USSD Emergency</DialogTitle>
+                          <DialogDescription>
+                            Mark emergency from {alert.phone_number} as resolved
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="ussd-notes">Resolution Notes</Label>
+                            <Textarea
+                              id="ussd-notes"
+                              placeholder="Action taken to help this guest user..."
+                              value={resolveNotes}
+                              onChange={(e) => setResolveNotes(e.target.value)}
+                              rows={4}
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            onClick={handleResolveUssd}
+                            disabled={actionLoading}
+                          >
+                            {actionLoading ? 'Resolving...' : 'Confirm Resolution'}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   </CardContent>
                 </Card>
               ))}

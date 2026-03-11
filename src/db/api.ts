@@ -361,20 +361,22 @@ export async function resolveEmergencyAlert(id: string, userId: string, notes?: 
 export async function getUssdAlerts() {
   const { data, error } = await supabase
     .from('ussd_emergency_alerts')
-    .select('*')
+    .select('*, resolver:profiles!ussd_emergency_alerts_resolved_by_fkey(full_name)')
     .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching USSD alerts:', error);
-    return [];
-  }
-  return data || [];
+  if (error) throw error;
+  return data;
 }
 
-export async function resolveUssdAlert(id: string, userId?: string, status: string = 'resolved') {
+export async function resolveUssdAlert(id: string, userId?: string, notes?: string, status: string = 'resolved') {
   const { data, error } = await supabase
     .from('ussd_emergency_alerts')
-    .update({ status })
+    .update({
+      status,
+      notes: notes || null,
+      resolved_by: userId || null,
+      resolved_at: new Date().toISOString()
+    })
     .eq('id', id)
     .select()
     .maybeSingle();
@@ -387,7 +389,7 @@ export async function resolveUssdAlert(id: string, userId?: string, status: stri
       action: 'Resolved USSD alert',
       entity_type: 'ussd_alert',
       entity_id: id,
-      details: `Resolved USSD guest alert for ${data.phone_number}`
+      details: `Resolved USSD guest alert for ${data.phone_number}${notes ? ': ' + notes : ''}`
     });
   }
 
