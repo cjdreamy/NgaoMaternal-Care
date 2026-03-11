@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/layouts/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +9,9 @@ import type { EducationalContent } from '@/types';
 import { BookOpen, Calendar, Sparkles, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { generateAIResponse } from '@/services/gemini';
+import { generateAIResponse } from '@/services/ai';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const FEATURED_CONTENT: EducationalContent[] = [
   {
@@ -118,7 +119,7 @@ For each resource, provide:
 
 Focus on trustworthy, evidence-based content that covers topics like prenatal care, nutrition, warning signs, fetal development, and labor preparation.`;
 
-      const response = await generateAIResponse(prompt);
+      const response = await generateAIResponse(prompt, 'suggestions');
       setAiSuggestions(response);
     } catch (error: any) {
       console.error('Error loading AI suggestions:', error);
@@ -218,9 +219,9 @@ Focus on trustworthy, evidence-based content that covers topics like prenatal ca
                   <Skeleton className="h-4 w-4/6 bg-muted" />
                 </div>
               ) : (
-                <div className="prose prose-sm max-w-none">
-                  <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                    {aiSuggestions}
+                <div className="prose prose-sm max-w-none dark:prose-invert">
+                  <div className="text-sm leading-relaxed">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{aiSuggestions}</ReactMarkdown>
                   </div>
                   <p className="text-xs text-muted-foreground mt-4 italic">
                     Note: These are AI-generated suggestions. Always verify information with your healthcare provider.

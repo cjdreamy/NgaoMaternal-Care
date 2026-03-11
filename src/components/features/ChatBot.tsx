@@ -5,7 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
-import { generateAIResponse } from '@/services/gemini';
+import { generateAIResponse } from '@/services/ai';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -123,11 +125,13 @@ user: ${input.trim()}`;
                 )}
                 <div
                   className={`rounded-lg px-4 py-2 max-w-[75%] break-words overflow-wrap-anywhere ${message.role === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted'
                     }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                  <div className="text-sm prose prose-sm max-w-none dark:prose-invert prose-p:leading-tight prose-p:my-1">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                  </div>
                 </div>
                 {message.role === 'user' && (
                   <div className="h-8 w-8 rounded-full bg-secondary/10 flex items-center justify-center shrink-0">

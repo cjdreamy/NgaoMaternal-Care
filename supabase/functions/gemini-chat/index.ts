@@ -1,7 +1,7 @@
 import { corsHeaders } from '../_shared/cors.ts';
 
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+const OPENAI_API_URL = "https://api.llmapi.ai/v1/chat/completions";
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -10,7 +10,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { messages, type = 'chat' } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const { messages, type = 'chat' } = body;
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(
@@ -19,87 +20,85 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!GEMINI_API_KEY) {
+    if (!OPENAI_API_KEY) {
       return new Response(
-        JSON.stringify({ error: 'GEMINI_API_KEY not configured in Edge Function secrets' }),
+        JSON.stringify({ error: 'OPENAI_API_KEY not configured in Edge Function secrets' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Format messages for Gemini API
-    const contents = messages.map((msg: { role: string; content: string }) => ({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }]
-    }));
-
-    // Add system context based on type
+    // Prepare system message based on type
+    let systemMessage = "";
     if (type === 'suggestions') {
-      contents.unshift({
-        role: 'user',
-        parts: [{
-          text: `You are a maternal health content curator. Suggest relevant and trustworthy resources including:
-1. Recent maternal health articles from reputable sources
+      systemMessage = `You are a maternal health content curator. Suggest 5-7 high-quality maternal health resources including:
+1. Recent maternal health articles from reputable sources (WHO, CDC, medical journals)
 2. Educational YouTube videos about pregnancy and maternal care
 3. Publications from maternal health doctors and experts
 4. Evidence-based pregnancy guides
 
-Format your response as a structured list with titles, brief descriptions, and why each resource is valuable.`
-        }]
-      });
+Format your response as a structured list with titles, brief descriptions, and why each resource is valuable.`;
     } else {
-      contents.unshift({
-        role: 'user',
-        parts: [{
-          text: `You are a compassionate maternal health assistant for NgaoMaternal Care. Provide:
+      systemMessage = `You are a compassionate maternal health assistant for NgaoMaternal Care. Provide:
 - Evidence-based pregnancy and maternal health information
 - Supportive and empathetic responses
 - Clear guidance on when to seek medical attention
 - Culturally sensitive advice
-- Encouragement and reassurance
 
-IMPORTANT: Always recommend consulting healthcare providers for medical concerns. You provide information, not medical diagnosis.`
-        }]
-      });
+IMPORTANT: Always recommend consulting healthcare providers for medical concerns. You provide information, not medical diagnosis.`;
     }
 
-    // Make request to Gemini API
-    const response = await fetch(GEMINI_API_URL, {
+    const payload = {
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemMessage },
+        ...messages
+      ],
+      temperature: 0.7,
+      stream: false
+    };
+
+    console.log("Calling LLMAPI with payload...");
+
+    // Make request to OpenAI-compatible API
+    const response = await fetch(OPENAI_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
       },
-      body: JSON.stringify({ contents }),
+      body: JSON.stringify(payload),
     });
 
+    const responseText = await response.text();
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Gemini API error:', errorText);
-
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: 'API quota exceeded. Please try again later.' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
+      console.error(`AI API error (${response.status}):`, responseText);
       return new Response(
-        JSON.stringify({ error: 'Failed to get response from AI service' }),
+        JSON.stringify({ error: `AI Service Error ${response.status}`, details: responseText }),
         { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Stream the response back to client
-    return new Response(response.body, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
-    });
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error("Failed to parse AI response:", responseText);
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON from AI service", details: responseText }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const content = data.choices?.[0]?.message?.content || "";
+
+    return new Response(
+      JSON.stringify({ content }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
-    console.error('Error in gemini-chat function:', error);
+    console.error('Internal Error in AI chat function:', error);
     return new Response(
       JSON.stringify({ error: error.message || 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
