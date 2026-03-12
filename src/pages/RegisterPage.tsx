@@ -1,4 +1,4 @@
-  import { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/db/supabase';
 import { updateProfile } from '@/db/api';
 import type { UserRole } from '@/types';
 
@@ -63,7 +64,7 @@ export default function RegisterPage() {
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Get the current user and update profile with additional info
-      const { data: { user } } = await (await import('@/db/supabase')).supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
 
       if (user) {
         await updateProfile(user.id, {
