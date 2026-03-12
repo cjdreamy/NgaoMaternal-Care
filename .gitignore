@@ -37,7 +37,7 @@ docs
 .env.local
 .env.example
 .env.production
-AI_FEATURES.md
+#AI_FEATURES.md
 biome.json
 ussd-service/.env
 ussd-service/.env.local

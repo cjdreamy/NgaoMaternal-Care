@@ -210,7 +210,7 @@ export default function HomePage() {
                   <Github className="h-5 w-5" />
                 </a>
                 <a
-                  href="https://youtu.be/FD8XG7VMz4"
+                  href="https://youtu.be/FD8XG7VMz4Y"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-muted-foreground hover:text-primary transition-colors"
@@ -245,7 +245,7 @@ export default function HomePage() {
               <ul className="space-y-2 text-sm">
                 <li>
                   <a
-                    href="https://youtu.be/FD8XG7VMz4"
+                    href="https://youtu.be/FD8XG7VMz4Y"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
