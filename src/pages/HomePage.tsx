@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Heart, Shield, Bell, BookOpen, Activity, Users } from 'lucide-react';
+import { Heart, Shield, Bell, BookOpen, Activity, Users, Github, Youtube, Mail, ExternalLink } from 'lucide-react';
 
 export default function HomePage() {
   return (
@@ -182,6 +182,113 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="bg-background border-t py-12">
+        <div className="container">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            {/* Brand Column */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <img src="/ngaologo.jpg" alt="Logo" className="h-8 w-8 rounded-lg" />
+                <span className="font-bold text-xl tracking-tight text-foreground">
+                  NgaoMaternal Care
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Bridging the gap between rural pregnant women and healthcare facilities.
+                Our mission: Zero preventable maternal deaths.
+              </p>
+              <div className="flex space-x-4">
+                <a
+                  href="https://github.com/cjdreamy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-primary transition-colors"
+                  aria-label="GitHub"
+                >
+                  <Github className="h-5 w-5" />
+                </a>
+                <a
+                  href="https://youtu.be/FD8XG7VMz4"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-primary transition-colors"
+                  aria-label="YouTube Tutorial"
+                >
+                  <Youtube className="h-5 w-5" />
+                </a>
+                <a
+                  href="mailto:cjdreamy402@gmail.com"
+                  className="text-muted-foreground hover:text-primary transition-colors"
+                  aria-label="Email"
+                >
+                  <Mail className="h-5 w-5" />
+                </a>
+              </div>
+            </div>
+
+            {/* Quick Links */}
+            <div>
+              <h4 className="font-semibold mb-4 text-foreground uppercase tracking-wider text-xs">Quick Links</h4>
+              <ul className="space-y-2 text-sm">
+                <li><Link to="/" className="text-muted-foreground hover:text-primary transition-colors">Home</Link></li>
+                <li><Link to="/login" className="text-muted-foreground hover:text-primary transition-colors">Login</Link></li>
+                <li><Link to="/register" className="text-muted-foreground hover:text-primary transition-colors">Register</Link></li>
+                <li><Link to="/education" className="text-muted-foreground hover:text-primary transition-colors">Education Resources</Link></li>
+              </ul>
+            </div>
+
+            {/* Support */}
+            <div>
+              <h4 className="font-semibold mb-4 text-foreground uppercase tracking-wider text-xs">Support</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <a
+                    href="https://youtu.be/FD8XG7VMz4"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+                  >
+                    Site Tutorial <ExternalLink className="h-3 w-3" />
+                  </a>
+                </li>
+                <li><a href="mailto:cjdreamy402@gmail.com" className="text-muted-foreground hover:text-primary transition-colors">Help Center</a></li>
+                <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors">Privacy Policy</a></li>
+                <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors">Terms of Service</a></li>
+              </ul>
+            </div>
+
+            {/* Contact */}
+            <div>
+              <h4 className="font-semibold mb-4 text-foreground uppercase tracking-wider text-xs">Get in Touch</h4>
+              <p className="text-sm text-muted-foreground mb-4">
+                Have questions or need support? Reach out to our team.
+              </p>
+              <a
+                href="mailto:cjdreamy402@gmail.com"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
+              >
+                <Mail className="h-4 w-4" />
+                Contact Us
+              </a>
+            </div>
+          </div>
+
+          <div className="border-t border-border mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
+            <p>© {new Date().getFullYear()} NgaoMaternal Care. All rights reserved.</p>
+            <div className="flex items-center gap-2">
+              <span>Made with</span>
+              <Heart className="h-4 w-4 text-red-500 fill-red-500" />
+              <span>by</span>
+              <a href="https://github.com/cjdreamy" target="_blank" rel="noopener noreferrer" className="font-medium text-foreground hover:underline">
+                cjdreamy
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
+
