@@ -33,13 +33,43 @@ app.post('/api/ai/chat', async (req, res) => {
 
         let systemMessage = "";
         if (type === 'suggestions') {
-            systemMessage = `You are a maternal health content curator. Suggest 5-7 high-quality maternal health resources including:
-1. Recent maternal health articles from reputable sources (WHO, CDC, medical journals)
-2. Educational YouTube videos about pregnancy and maternal care
-3. Publications from maternal health doctors and experts
-4. Evidence-based pregnancy guides
+            //             systemMessage = `You are a maternal health content curator. Suggest 5-7 high-quality maternal health resources including:
+            // 1. Recent maternal health articles from reputable sources (WHO, CDC, medical journals)
+            // 2. Educational YouTube videos about pregnancy and maternal care
+            // 3. Publications from maternal health doctors and experts and like one link
+            // 4. Evidence-based pregnancy guides
+            // 4. Youtube video link
 
-Format your response as a structured list with titles, brief descriptions, and why each resource is valuable. Use Markdown for formatting (bold for titles, bullet points, etc.) to make it highly readable.`;
+            // Format your response as a structured list with titles, brief descriptions, and why each resource is valuable. Use Markdown for formatting (bold for titles, bullet points, etc.) to make it highly readable.`;
+            //         } else {
+
+            systemMessage = `You are a maternal health content curator.
+
+Return 5–7 resources in JSON format.
+
+Each item must have:
+- "title"
+- "description"
+- "why_valuable"
+- "url"
+
+Requirements:
+- Every item MUST include a valid, complete URL (https://...)
+- Include a mix of articles, YouTube videos, expert publications, and pregnancy guides
+- Use only trusted, reputable sources (WHO, CDC, medical journals, certified doctors)
+-IMPORTANT: Prefer well-known domains (who.int, cdc.gov, youtube.com, nih.gov)
+
+Return ONLY valid JSON. No extra text.
+
+Example format:
+[
+  {
+    "title": "...",
+    "description": "...",
+    "why_valuable": "...",
+    "url": "https://..."
+  }
+]`;
         } else {
             systemMessage = `You are a compassionate maternal health assistant for NgaoMaternal Care. Provide:
 - Evidence-based pregnancy and maternal health information
@@ -51,7 +81,7 @@ IMPORTANT: Always recommend consulting healthcare providers for medical concerns
         }
 
         const payload = {
-            model: "gpt-4o-mini",
+            model: "gpt-5.4",
             messages: [
                 { role: "system", content: systemMessage },
                 ...messages
@@ -66,7 +96,28 @@ IMPORTANT: Always recommend consulting healthcare providers for medical concerns
             }
         });
 
-        const content = response.data.choices?.[0]?.message?.content || "";
+        let content = response.data.choices?.[0]?.message?.content || "";
+
+        if (type === 'suggestions') {
+            try {
+                // Try to parse the JSON. Remove markdown backticks if present.
+                const jsonStr = content.replace(/```json\n?|\n?```/gi, '').trim();
+                const resources = JSON.parse(jsonStr);
+
+                if (Array.isArray(resources)) {
+                    content = "Here are some recommended resources:\n\n" + resources.map(res =>
+                        `### [${res.title}](${res.url})\n` +
+                        (res.type ? `**Type:** ${res.type}\n\n` : "") +
+                        `**Description:** ${res.description}\n\n` +
+                        `**Why it's valuable:** ${res.why_valuable}`
+                    ).join('\n\n---\n\n');
+                }
+            } catch (e) {
+                console.error('[JSON Parse Error]:', e.message);
+                // If parsing fails, content remains as the original string
+            }
+        }
+
         res.json({ content });
 
     } catch (error) {

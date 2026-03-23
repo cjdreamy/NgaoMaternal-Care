@@ -53,3 +53,6 @@ THEME_TOGGLE.md
 SUPABASE_SETUP_GUIDE.md
 VISUAL_BRANDING.md
 CHATBOT_FIX.md
+sms-app/node_modules
+sms-app/.env
+
