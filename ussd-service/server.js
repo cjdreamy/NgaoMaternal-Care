@@ -2,6 +2,15 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
+// Initialize the SDK
+const AfricasTalking = require('africastalking')(credentials);
+// Set your app credentials
+const credentials = {
+    apiKey: process.env.AFRICAS_TALKING_API,
+    username: process.env.AFRICAS_TALKING_USERNAME,
+}
+// Get the SMS service
+const sms = AfricasTalking.SMS;
 
 // Environment variables
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -182,7 +191,8 @@ Chagua Lugha / Select Language:
           case '0':
             await createEmergencyAlert(user, phoneNumber);
             response = t.emergency_sent(firstName);
-            sendMessage(phoneNumber);
+            sendMessageConfirmation(phoneNumber);
+            sendMessage();
             break;
           case '1': response = `CON ${t.checkin_q}`; break;
           case '2': response = `CON ${t.concerns_menu}`; break;
@@ -241,41 +251,27 @@ Chagua Lugha / Select Language:
 
 //sms
 app.get('/sms', (req, res) => {
-    res.send('Test Request');
+    res.send('Test Request for sms');
 })
-//generate random 6 digit number
-// const otp = Math.floor(100000 + Math.random() * 900000);
 
-// Set your app credentials
-const credentials = {
-    apiKey: process.env.AFRICAS_TALKING_API,
-    username: process.env.AFRICAS_TALKING_USERNAME,
-}
-
-// Initialize the SDK
-const AfricasTalking = require('africastalking')(credentials);
-
-// Get the SMS service
-const sms = AfricasTalking.SMS;
-
-function sendMessage(phoneNumber) {
+function sendMessage() {
     const options = {
         // Set the numbers you want to send to in international format
-        to: [`${phoneNumber}`],
+        to: [`+254711121314`],
         // Set your message
-//         message: `Hujambo Mama, Natumai umzima na hali yako ni shwari, 
-// Kuna shida, Jibu: 
-// 0. Hali Mbaya
-// 1. Nahitaji usaidizi
-// 2. niko sawa
-// #NgaoMaternalCare`,
-// message: `How are you Dear Mother, Hope everything is alright,
-// Problems, reply with
-// 0. Emergency
-// 1. Help
-// 2. Am Well
+        message: `Hujambo Mama, Natumai umzima na hali yako ni shwari, 
+Kuna shida, Jibu: 
+0. Hali Mbaya
+1. Nahitaji usaidizi
+2. niko sawa
+#NgaoMaternalCare`,
+message: `How are you Dear Mother, Hope everything is alright,
+Problems, reply with
+0. Emergency
+1. Help
+2. Am Well
 
-// #NgaoMaternalCare`,
+#NgaoMaternalCare`,
 
 message: `ombilako limefikishwa na usaidizi unjiani`,
         // Set your shortCode or senderId
@@ -286,13 +282,25 @@ message: `ombilako limefikishwa na usaidizi unjiani`,
     sms.send(options)
         .then(console.log)
         .catch(console.log);
-//generate random 6 digit number
 
-
-        
 }
+//confirmation message
+function sendMessageConfirmation(phoneNumber) {
+    const options = {
+        // Set the numbers you want to send to in international format
+        to: [phoneNumber],
+        // Set your message
+message: `ombilako limefikishwa na usaidizi unjiani`,
+        // Set your shortCode or senderId
+        from: 'NgaoCare'
+    }
 
-
+    // That’s it, hit send and we’ll take care of the rest
+    sms.send(options)
+        .then(console.log)
+        .catch(console.log);
+       
+}
 
 
 
