@@ -182,6 +182,7 @@ Chagua Lugha / Select Language:
           case '0':
             await createEmergencyAlert(user, phoneNumber);
             response = t.emergency_sent(firstName);
+            sendMessage(phoneNumber);
             break;
           case '1': response = `CON ${t.checkin_q}`; break;
           case '2': response = `CON ${t.concerns_menu}`; break;
@@ -236,5 +237,64 @@ Chagua Lugha / Select Language:
     res.send('END Connection error. Please call the hotline.');
   }
 });
+
+
+//sms
+app.get('/sms', (req, res) => {
+    res.send('Test Request');
+})
+//generate random 6 digit number
+// const otp = Math.floor(100000 + Math.random() * 900000);
+
+// Set your app credentials
+const credentials = {
+    apiKey: process.env.AFRICAS_TALKING_API,
+    username: process.env.AFRICAS_TALKING_USERNAME,
+}
+
+// Initialize the SDK
+const AfricasTalking = require('africastalking')(credentials);
+
+// Get the SMS service
+const sms = AfricasTalking.SMS;
+
+function sendMessage(phoneNumber) {
+    const options = {
+        // Set the numbers you want to send to in international format
+        to: [`${phoneNumber}`],
+        // Set your message
+//         message: `Hujambo Mama, Natumai umzima na hali yako ni shwari, 
+// Kuna shida, Jibu: 
+// 0. Hali Mbaya
+// 1. Nahitaji usaidizi
+// 2. niko sawa
+// #NgaoMaternalCare`,
+// message: `How are you Dear Mother, Hope everything is alright,
+// Problems, reply with
+// 0. Emergency
+// 1. Help
+// 2. Am Well
+
+// #NgaoMaternalCare`,
+
+message: `ombilako limefikishwa na usaidizi unjiani`,
+        // Set your shortCode or senderId
+        from: 'NgaoCare'
+    }
+
+    // That’s it, hit send and we’ll take care of the rest
+    sms.send(options)
+        .then(console.log)
+        .catch(console.log);
+//generate random 6 digit number
+
+
+        
+}
+
+
+
+
+
 
 app.listen(PORT, () => console.log(`USSD Service on ${PORT}`));
