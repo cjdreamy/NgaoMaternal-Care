@@ -1,6 +1,8 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const { createClient } = require('@supabase/supabase-js');
+const cron = require('node-cron');
+const { PhoneCallIcon } = require('lucide-react');
 require('dotenv').config();
 // Set your app credentials
 const credentials = {
@@ -192,7 +194,6 @@ Chagua Lugha / Select Language:
             await createEmergencyAlert(user, phoneNumber);
             response = t.emergency_sent(firstName);
             sendMessageConfirmation(phoneNumber);
-            sendMessage();
             break;
           case '1': response = `CON ${t.checkin_q}`; break;
           case '2': response = `CON ${t.concerns_menu}`; break;
@@ -213,6 +214,7 @@ Chagua Lugha / Select Language:
           if (c2 === '3') {
             await createEmergencyAlert(user, phoneNumber);
             response = t.urgent_clinic;
+            sendMessageConfirmation(phoneNumber);
           } else {
             await saveHealthCheckin(user.id, { symptoms: c2 === '2' ? ['reduced_movement'] : [] });
             response = t.saved(firstName);
@@ -223,6 +225,7 @@ Chagua Lugha / Select Language:
           await createEmergencyAlert(user, phoneNumber);
           await saveHealthCheckin(user.id, { symptoms: [s] });
           response = t.urgent_noted(s);
+          sendMessageConfirmation(phoneNumber);
         } else if (c1 === '3') { // Advice
           if (c2 === '1') response = t.hotline_call;
           else if (c2 === '2') response = t.nurse_hotline;
@@ -254,10 +257,10 @@ app.get('/sms', (req, res) => {
     res.send('Test Request for sms');
 })
 
-function sendMessage() {
+function sendMessage(phoneN) {
     const options = {
         // Set the numbers you want to send to in international format
-        to: [`+254711121314`],
+        to: [phoneN],
         // Set your message
         message: `Hujambo Mama, Natumai umzima na hali yako ni shwari, 
 Kuna shida, Jibu: 
@@ -272,9 +275,7 @@ Problems, reply with
 2. Am Well
 
 #NgaoMaternalCare`,
-
-message: `ombilako limefikishwa na usaidizi unjiani`,
-        // Set your shortCode or senderId
+// Set your shortCode or senderId
         from: 'NgaoCare'
     }
 
@@ -301,6 +302,57 @@ message: `ombilako limefikishwa na usaidizi unjiani`,
         .catch(console.log);
        
 }
+
+
+
+// function sendDailyCheckinMessage() {
+//   console.log("Sending check-in message...");
+//   sendMessage();
+// }
+
+// // Schedule: '0' (minute) '8' (hour) '*' (every day) '*' (every month) '*' (every day of week)
+// cron.schedule('0 8 * * *', () => {
+//   sendDailyCheckinMessage();
+// }, {
+//   scheduled: true,
+//   timezone: "Africa/Nairobi" // This handles EAT (UTC+3) automatically
+// });
+
+// console.log("Scheduler started. Monitoring for 8:00 AM EAT...");
+
+
+async function sendDailyCheckinMessage() {
+  console.log("Starting daily check-in broadcast at 8:00 AM EAT...");
+
+  // 1. Fetch all users from Supabase
+  const { data: users, error } = await supabase
+    .from('profiles')
+    .select('phone'); // Only select what you need
+   
+
+  if (error) {
+    console.error("Error fetching users:", error);
+    return;
+  }
+
+  // 2. Use forEach to send a message to each user
+  users.forEach((user) => {
+    if (user.phone) {
+      console.log(`Sending message to: ${user.phone}`);
+      sendMessage(user.phone); 
+    }
+  });
+}
+
+// 3. Schedule the cron job
+cron.schedule('0 8 * * *', () => {
+  sendDailyCheckinMessage();
+}, {
+  scheduled: true,
+  timezone: "Africa/Nairobi"
+});
+
+console.log("Scheduler started. Monitoring for 8:00 AM EAT...");
 
 
 
