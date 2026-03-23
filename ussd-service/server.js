@@ -2,13 +2,13 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
-// Initialize the SDK
-const AfricasTalking = require('africastalking')(credentials);
 // Set your app credentials
 const credentials = {
     apiKey: process.env.AFRICAS_TALKING_API,
     username: process.env.AFRICAS_TALKING_USERNAME,
 }
+// Initialize the SDK
+const AfricasTalking = require('africastalking')(credentials);
 // Get the SMS service
 const sms = AfricasTalking.SMS;
 
