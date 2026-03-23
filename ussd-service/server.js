@@ -15,6 +15,10 @@ const app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
+//test ui
+app.get('/', (req, res) => {
+  res.send('USSD Service is running!');
+});
 // Helper: Get or Create USSD User logic
 async function getUssdUser(phoneNumber) {
   const normalizedPhone = phoneNumber.startsWith('+') ? phoneNumber.substring(1) : phoneNumber;
